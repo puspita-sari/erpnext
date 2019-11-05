@@ -30,8 +30,8 @@ class AccountsController(TransactionBase):
 		return self.__company_currency
 
 	def onload(self):
-		self.get("__onload").make_payment_via_journal_entry \
-			= frappe.db.get_single_value('Accounts Settings', 'make_payment_via_journal_entry')
+		self.set_onload("make_payment_via_journal_entry",
+			frappe.db.get_single_value('Accounts Settings', 'make_payment_via_journal_entry'))
 
 		if self.is_new():
 			relevant_docs = ("Quotation", "Purchase Order", "Sales Order",
@@ -88,11 +88,14 @@ class AccountsController(TransactionBase):
 			self.validate_paid_amount()
 
 		if self.doctype in ['Purchase Invoice', 'Sales Invoice']:
-			if cint(self.allocate_advances_automatically):
+			pos_check_field = "is_pos" if self.doctype=="Sales Invoice" else "is_paid"
+			if cint(self.allocate_advances_automatically) and not cint(self.get(pos_check_field)):
 				self.set_advances()
 
 			if self.is_return:
 				self.validate_qty()
+
+		validate_regional(self)
 
 	def validate_invoice_documents_schedule(self):
 		self.validate_payment_schedule_dates()
@@ -234,6 +237,10 @@ class AccountsController(TransactionBase):
 				document_type = "{} Item".format(self.doctype)
 				parent_dict.update({"document_type": document_type})
 
+			# party_name field used for customer in quotation
+			if self.doctype == "Quotation" and self.quotation_to == "Customer" and parent_dict.get("party_name"):
+				parent_dict.update({"customer": parent_dict.get("party_name")})
+
 			for item in self.get("items"):
 				if item.get("item_code"):
 					args = parent_dict.copy()
@@ -341,7 +348,7 @@ class AccountsController(TransactionBase):
 			'fiscal_year': fiscal_year,
 			'voucher_type': self.doctype,
 			'voucher_no': self.name,
-			'remarks': self.get("remarks"),
+			'remarks': self.get("remarks") or self.get("remark"),
 			'debit': 0,
 			'credit': 0,
 			'debit_in_account_currency': 0,
@@ -367,7 +374,7 @@ class AccountsController(TransactionBase):
 	def validate_qty_is_not_zero(self):
 		for item in self.items:
 			if not item.qty:
-				frappe.throw("Item quantity can not be zero")
+				frappe.throw(_("Item quantity can not be zero"))
 
 	def validate_account_currency(self, account, account_currency=None):
 		valid_currency = [self.company_currency]
@@ -740,7 +747,12 @@ class AccountsController(TransactionBase):
 				count += 1
 				item.qty = group_item_qty[item.item_code]
 				item.amount = group_item_amount[item.item_code]
-				item.rate = flt(flt(item.amount) / flt(item.qty), item.precision("rate"))
+
+				if item.qty:
+					item.rate = flt(flt(item.amount) / flt(item.qty), item.precision("rate"))
+				else:
+					item.rate = 0
+
 				item.idx = count
 				del group_item_qty[item.item_code]
 			else:
@@ -759,6 +771,9 @@ class AccountsController(TransactionBase):
 		grand_total = self.get("rounded_total") or self.grand_total
 		if self.doctype in ("Sales Invoice", "Purchase Invoice"):
 			grand_total = grand_total - flt(self.write_off_amount)
+
+		if self.get("total_advance"):
+			grand_total -= self.get("total_advance")
 
 		if not self.get("payment_schedule"):
 			if self.get("payment_terms_template"):
@@ -805,9 +820,12 @@ class AccountsController(TransactionBase):
 			total = flt(total, self.precision("grand_total"))
 
 			grand_total = flt(self.get("rounded_total") or self.grand_total, self.precision('grand_total'))
+			if self.get("total_advance"):
+				grand_total -= self.get("total_advance")
+
 			if self.doctype in ("Sales Invoice", "Purchase Invoice"):
 				grand_total = grand_total - flt(self.write_off_amount)
-			if total != grand_total:
+			if total != flt(grand_total, self.precision("grand_total")):
 				frappe.throw(_("Total Payment Amount in Payment Schedule must be equal to Grand / Rounded Total"))
 
 	def is_rounded_total_disabled(self):
@@ -957,11 +975,11 @@ def get_advance_journal_entries(party_type, party, party_account, amount_field,
 
 
 def get_advance_payment_entries(party_type, party, party_account, order_doctype,
-		order_list=None, include_unallocated=True, against_all_orders=False, limit=1000):
+		order_list=None, include_unallocated=True, against_all_orders=False, limit=None):
 	party_account_field = "paid_from" if party_type == "Customer" else "paid_to"
 	payment_type = "Receive" if party_type == "Customer" else "Pay"
 	payment_entries_against_order, unallocated_payment_entries = [], []
-	limit_cond = "limit %s" % (limit or 1000)
+	limit_cond = "limit %s" % limit if limit else ""
 
 	if order_list or against_all_orders:
 		if order_list:
@@ -1132,3 +1150,7 @@ def update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name):
 	p_doctype.update_blanket_order()
 	p_doctype.update_billing_percentage()
 	p_doctype.set_status()
+
+@erpnext.allow_regional
+def validate_regional(doc):
+	pass

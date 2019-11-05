@@ -9,9 +9,12 @@ erpnext.accounts.PurchaseInvoice = erpnext.buying.BuyingController.extend({
 		this.setup_posting_date_time_check();
 		this._super(doc);
 
-		// formatter for material request item
-		this.frm.set_indicator_formatter('item_code',
-			function(doc) { return (doc.qty<=doc.received_qty) ? "green" : "orange" })
+		// formatter for purchase invoice item
+		if(this.frm.doc.update_stock) {
+			this.frm.set_indicator_formatter('item_code', function(doc) {
+				return (doc.qty<=doc.received_qty) ? "green" : "orange";
+			});
+		}
 	},
 	onload: function() {
 		this._super();
@@ -154,7 +157,7 @@ erpnext.accounts.PurchaseInvoice = erpnext.buying.BuyingController.extend({
 	can_change_release_date: function(date) {
 		const diff = frappe.datetime.get_diff(date, frappe.datetime.nowdate());
 		if (diff < 0) {
-			frappe.throw('New release date should be in the future');
+			frappe.throw(__('New release date should be in the future'));
 			return false;
 		} else {
 			return true;
@@ -282,6 +285,7 @@ erpnext.accounts.PurchaseInvoice = erpnext.buying.BuyingController.extend({
 	is_paid: function() {
 		hide_fields(this.frm.doc);
 		if(cint(this.frm.doc.is_paid)) {
+			this.frm.set_value("allocate_advances_automatically", 0);
 			if(!this.frm.doc.company) {
 				this.frm.set_value("is_paid", 0)
 				frappe.msgprint(__("Please specify Company to proceed"));
@@ -465,7 +469,7 @@ cur_frm.fields_dict["items"].grid.get_field("cost_center").get_query = function(
 
 cur_frm.cscript.cost_center = function(doc, cdt, cdn){
 	var d = locals[cdt][cdn];
-	if(d.idx == 1 && d.cost_center){
+	if(d.cost_center){
 		var cl = doc.items || [];
 		for(var i = 0; i < cl.length; i++){
 			if(!cl[i].cost_center) cl[i].cost_center = d.cost_center;
@@ -507,11 +511,25 @@ frappe.ui.form.on("Purchase Invoice", {
 				}
 			}
 		}
+
+		frm.set_query("cost_center", function() {
+			return {
+				filters: {
+					company: frm.doc.company,
+					is_group: 0
+				}
+			};
+		});
 	},
 
 	onload: function(frm) {
-		if(frm.doc.__onload && !frm.doc.__onload.supplier_tds) {
-			me.frm.set_df_property("apply_tds", "read_only", 1);
+		if(frm.doc.__onload) {
+			if(frm.doc.supplier) {
+				frm.doc.apply_tds = frm.doc.__onload.supplier_tds ? 1 : 0;
+			}
+			if(!frm.doc.__onload.supplier_tds) {
+				frm.set_df_property("apply_tds", "read_only", 1);
+			}
 		}
 
 		erpnext.queries.setup_queries(frm, "Warehouse", function() {

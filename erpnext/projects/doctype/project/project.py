@@ -30,11 +30,13 @@ class Project(Document):
 
 		self.update_costing()
 
-	def __setup__(self):
+	def before_print(self):
 		self.onload()
 
 	def load_tasks(self):
 		"""Load `tasks` from the database"""
+		project_task_custom_fields = frappe.get_all("Custom Field", {"dt": "Project Task"}, "fieldname")
+
 		self.tasks = []
 		for task in self.get_tasks():
 			task_map = {
@@ -47,7 +49,7 @@ class Project(Document):
 				"task_weight": task.task_weight
 			}
 
-			self.map_custom_fields(task, task_map)
+			self.map_custom_fields(task, task_map, project_task_custom_fields)
 
 			self.append("tasks", task_map)
 
@@ -62,23 +64,41 @@ class Project(Document):
 					'name': ("not in", self.deleted_task_list)
 				})
 
-			return frappe.get_all("Task", "*", filters, order_by="exp_start_date asc")
+			return frappe.get_all("Task", "*", filters, order_by="exp_start_date asc, status asc")
 
 	def validate(self):
 		self.validate_project_name()
-		self.validate_dates()
 		self.validate_weights()
 		self.sync_tasks()
 		self.tasks = []
 		self.load_tasks()
+		self.validate_dates()
 		self.send_welcome_email()
-		self.update_percent_complete()
+		self.update_percent_complete(from_validate=True)
 
 	def validate_project_name(self):
 		if self.get("__islocal") and frappe.db.exists("Project", self.project_name):
 			frappe.throw(_("Project {0} already exists").format(frappe.safe_decode(self.project_name)))
 
 	def validate_dates(self):
+		if self.tasks:
+			for d in self.tasks:
+				if self.expected_start_date:
+					if d.start_date and getdate(d.start_date) < getdate(self.expected_start_date):
+						frappe.throw(_("Start date of task <b>{0}</b> cannot be less than <b>{1}</b> expected start date <b>{2}</b>")
+							.format(d.title, self.name, self.expected_start_date))
+					if d.end_date and getdate(d.end_date) < getdate(self.expected_start_date):
+						frappe.throw(_("End date of task <b>{0}</b> cannot be less than <b>{1}</b> expected start date <b>{2}</b>")
+							.format(d.title, self.name, self.expected_start_date))
+
+				if self.expected_end_date:
+					if d.start_date and getdate(d.start_date) > getdate(self.expected_end_date):
+						frappe.throw(_("Start date of task <b>{0}</b> cannot be greater than <b>{1}</b> expected end date <b>{2}</b>")
+							.format(d.title, self.name, self.expected_end_date))
+					if d.end_date and getdate(d.end_date) > getdate(self.expected_end_date):
+						frappe.throw(_("End date of task <b>{0}</b> cannot be greater than <b>{1}</b> expected end date <b>{2}</b>")
+							.format(d.title, self.name, self.expected_end_date))
+
 		if self.expected_start_date and self.expected_end_date:
 			if getdate(self.expected_end_date) < getdate(self.expected_start_date):
 				frappe.throw(_("Expected End Date can not be less than Expected Start Date"))
@@ -131,7 +151,7 @@ class Project(Document):
 					"task_weight": t.task_weight
 				})
 
-				self.map_custom_fields(t, task)
+				self.map_custom_fields(t, task, custom_fields)
 
 				task.flags.ignore_links = True
 				task.flags.from_project = True
@@ -155,10 +175,6 @@ class Project(Document):
 		for t in frappe.get_all("Task", ["name"], {"project": self.name, "name": ("not in", task_names)}):
 			self.deleted_task_list.append(t.name)
 
-	def update_costing_and_percentage_complete(self):
-		self.update_percent_complete()
-		self.update_costing()
-
 	def is_row_updated(self, row, existing_task_data, fields):
 		if self.get("__islocal") or not existing_task_data: return True
 
@@ -168,10 +184,8 @@ class Project(Document):
 			if row.get(field) != d.get(field):
 				return True
 
-	def map_custom_fields(self, source, target):
-		project_task_custom_fields = frappe.get_all("Custom Field", {"dt": "Project Task"}, "fieldname")
-
-		for field in project_task_custom_fields:
+	def map_custom_fields(self, source, target, custom_fields):
+		for field in custom_fields:
 			target.update({
 				field.fieldname: source.get(field.fieldname)
 			})
@@ -179,14 +193,12 @@ class Project(Document):
 	def update_project(self):
 		self.update_percent_complete()
 		self.update_costing()
-		self.flags.dont_sync_tasks = True
-		self.save(ignore_permissions=True)
 
 	def after_insert(self):
 		if self.sales_order:
 			frappe.db.set_value("Sales Order", self.sales_order, "project", self.name)
 
-	def update_percent_complete(self):
+	def update_percent_complete(self, from_validate=False):
 		if not self.tasks: return
 		total = frappe.db.sql("""select count(name) from tabTask where project=%s""", self.name)[0][0]
 		if not total and self.percent_complete:
@@ -216,6 +228,9 @@ class Project(Document):
 		elif not self.status == "Cancelled":
 			self.status = "Open"
 
+		if not from_validate:
+			self.db_update()
+
 	def update_costing(self):
 		from_time_sheet = frappe.db.sql("""select
 			sum(costing_amount) as costing_amount,
@@ -242,6 +257,7 @@ class Project(Document):
 		self.update_sales_amount()
 		self.update_billed_amount()
 		self.calculate_gross_margin()
+		self.db_update()
 
 	def calculate_gross_margin(self):
 		expense_amount = (flt(self.total_costing_amount) + flt(self.total_expense_claim)
@@ -295,14 +311,15 @@ class Project(Document):
 	def on_update(self):
 		self.delete_task()
 		self.load_tasks()
-		self.update_costing_and_percentage_complete()
+		self.update_project()
 		self.update_dependencies_on_duplicated_project()
 
 	def delete_task(self):
 		if not self.get('deleted_task_list'): return
 
 		for d in self.get('deleted_task_list'):
-			frappe.delete_doc("Task", d)
+			# unlink project
+			frappe.db.set_value('Task', d, 'project', '')
 
 		self.deleted_task_list = []
 
@@ -425,16 +442,17 @@ def daily_reminder():
 	projects =  get_projects_for_collect_progress("Daily", fields)
 
 	for project in projects:
-		if not check_project_update_exists(project.name, project.get("daily_time_to_send")):
+		if allow_to_make_project_update(project.name, project.get("daily_time_to_send"), "Daily"):
 			send_project_update_email_to_users(project.name)
 
 def twice_daily_reminder():
 	fields = ["first_email", "second_email"]
 	projects =  get_projects_for_collect_progress("Twice Daily", fields)
+	fields.remove("name")
 
 	for project in projects:
 		for d in fields:
-			if not check_project_update_exists(project.name, project.get(d)):
+			if allow_to_make_project_update(project.name, project.get(d), "Twicely"):
 				send_project_update_email_to_users(project.name)
 
 def weekly_reminder():
@@ -446,14 +464,19 @@ def weekly_reminder():
 		if current_day != project.day_to_send:
 			continue
 
-		if not check_project_update_exists(project.name, project.get("weekly_time_to_send")):
+		if allow_to_make_project_update(project.name, project.get("weekly_time_to_send"), "Weekly"):
 			send_project_update_email_to_users(project.name)
 
-def check_project_update_exists(project, time):
+def allow_to_make_project_update(project, time, frequency):
 	data = frappe.db.sql(""" SELECT name from `tabProject Update`
-		WHERE project = %s and date = %s and time >= %s """, (project, today(), time))
+		WHERE project = %s and date = %s """, (project, today()))
 
-	return True if data and data[0][0] else False
+	# len(data) > 1 condition is checked for twicely frequency
+	if data and (frequency in ['Daily', 'Weekly'] or len(data) > 1):
+		return False
+
+	if get_time(nowtime()) >= get_time(time):
+		return True
 
 def get_projects_for_collect_progress(frequency, fields):
 	fields.extend(["name"])

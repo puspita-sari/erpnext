@@ -255,11 +255,16 @@ $.extend(erpnext.utils, {
 		// get valid options for tree based on user permission & locals dict
 		let unscrub_option = frappe.model.unscrub(option);
 		let user_permission = frappe.defaults.get_user_permissions();
+		let options;
+
 		if(user_permission && user_permission[unscrub_option]) {
-			return user_permission[unscrub_option].map(perm => perm.doc);
+			options = user_permission[unscrub_option].map(perm => perm.doc);
 		} else {
-			return $.map(locals[`:${unscrub_option}`], function(c) { return c.name; }).sort();
+			options = $.map(locals[`:${unscrub_option}`], function(c) { return c.name; }).sort();
 		}
+
+		// filter unique values, as there may be multiple user permissions for any value
+		return options.filter((value, index, self) => self.indexOf(value) === index);
 	},
 	get_tree_default: function(option) {
 		// set default for a field based on user permission
@@ -280,6 +285,16 @@ $.extend(erpnext.utils, {
 		}
 		refresh_field(table_fieldname);
 	},
+
+	create_new_doc: function (doctype, update_fields) {
+		frappe.model.with_doctype(doctype, function() {
+			var new_doc = frappe.model.get_new_doc(doctype);
+			for (let [key, value] of Object.entries(update_fields)) {
+				new_doc[key] = value;
+			}
+			frappe.ui.form.make_quick_entry(doctype, null, null, new_doc);
+		});
+	}
 
 });
 

@@ -27,8 +27,10 @@ def execute():
 		for company in companies:
 			copy_doc = frappe.copy_doc(department_doc)
 			copy_doc.update({"company": company.name})
-			copy_doc.insert()
-
+			try:
+				copy_doc.insert()
+			except frappe.DuplicateEntryError:
+				pass
 			# append list of new department for each company
 			comp_dict[company.name][department.name] = copy_doc.name
 
@@ -68,7 +70,7 @@ def update_instructors(comp_dict):
 	emp_details = frappe.get_all("Employee", fields=["name", "company"])
 
 	for employee in emp_details:
-		records = comp_dict[employee.company]
+		records = comp_dict[employee.company] if employee.company else []
 
 		for department in records:
 			when_then.append('''

@@ -393,10 +393,18 @@ $.extend(erpnext.item, {
 	show_modal_for_manufacturers: function(frm) {
 		var dialog = new frappe.ui.Dialog({
 			fields: [
-				{fieldtype:'Link', options:'Manufacturer',
-					reqd:1, label:'Manufacturer'},
-				{fieldtype:'Data', label:'Manufacturer Part Number',
-					fieldname: 'manufacturer_part_no'},
+				{
+					fieldtype: 'Link',
+					fieldname: 'manufacturer',
+					options: 'Manufacturer',
+					label: 'Manufacturer',
+					reqd: 1,
+				},
+				{
+					fieldtype: 'Data',
+					label: 'Manufacturer Part Number',
+					fieldname: 'manufacturer_part_no'
+				},
 			]
 		});
 
@@ -407,7 +415,7 @@ $.extend(erpnext.item, {
 			// call the server to make the variant
 			data.template = frm.doc.name;
 			frappe.call({
-				method:"erpnext.controllers.item_variant.get_variant",
+				method: "erpnext.controllers.item_variant.get_variant",
 				args: data,
 				callback: function(r) {
 					var doclist = frappe.model.sync(r.message);
@@ -482,7 +490,7 @@ $.extend(erpnext.item, {
 
 				me.multiple_variant_dialog.hide();
 				frappe.call({
-					method:"erpnext.controllers.item_variant.enqueue_multiple_variant_creation",
+					method: "erpnext.controllers.item_variant.enqueue_multiple_variant_creation",
 					args: {
 						"item": frm.doc.name,
 						"args": selected_attributes
@@ -532,9 +540,9 @@ $.extend(erpnext.item, {
 			let p = new Promise(resolve => {
 				if(!d.numeric_values) {
 					frappe.call({
-						method:"frappe.client.get_list",
-						args:{
-							doctype:"Item Attribute Value",
+						method: "frappe.client.get_list",
+						args: {
+							doctype: "Item Attribute Value",
 							filters: [
 								["parent","=", d.attribute]
 							],
@@ -552,9 +560,9 @@ $.extend(erpnext.item, {
 					});
 				} else {
 					frappe.call({
-						method:"frappe.client.get",
-						args:{
-							doctype:"Item Attribute",
+						method: "frappe.client.get",
+						args: {
+							doctype: "Item Attribute",
 							name: d.attribute
 						}
 					}).then((r) => {
@@ -617,7 +625,7 @@ $.extend(erpnext.item, {
 			var args = d.get_values();
 			if(!args) return;
 			frappe.call({
-				method:"erpnext.controllers.item_variant.get_variant",
+				method: "erpnext.controllers.item_variant.get_variant",
 				args: {
 					"template": frm.doc.name,
 					"args": d.get_values()
@@ -639,7 +647,7 @@ $.extend(erpnext.item, {
 					} else {
 						d.hide();
 						frappe.call({
-							method:"erpnext.controllers.item_variant.create_variant",
+							method: "erpnext.controllers.item_variant.create_variant",
 							args: {
 								"item": frm.doc.name,
 								"args": d.get_values()
@@ -677,8 +685,8 @@ $.extend(erpnext.item, {
 				.on('input', function(e) {
 					var term = e.target.value;
 					frappe.call({
-						method:"erpnext.stock.doctype.item.item.get_item_attribute",
-						args:{
+						method: "erpnext.stock.doctype.item.item.get_item_attribute",
+						args: {
 							parent: i,
 							attribute_value: term
 						},
@@ -740,7 +748,7 @@ frappe.ui.form.on("UOM Conversion Detail", {
 		var row = locals[cdt][cdn];
 		if (row.uom) {
 			frappe.call({
-				method:"erpnext.stock.doctype.item.item.get_uom_conv_factor",
+				method: "erpnext.stock.doctype.item.item.get_uom_conv_factor",
 				args: {
 					"uom": row.uom,
 					"stock_uom": frm.doc.stock_uom
