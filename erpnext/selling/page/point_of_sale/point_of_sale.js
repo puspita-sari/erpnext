@@ -37,7 +37,7 @@ erpnext.pos.PointOfSale = class PointOfSale {
 		this.page = wrapper.page;
 
 		const assets = [
-			'assets/erpnext/js/pos/clusterize.js',
+			// 'assets/erpnext/js/pos/clusterize.js',
 			'assets/erpnext/css/pos.css'
 		];
 
@@ -45,6 +45,7 @@ erpnext.pos.PointOfSale = class PointOfSale {
 			this.make();
 		});
 	}
+
 
 	make() {
 		return frappe.run_serially([

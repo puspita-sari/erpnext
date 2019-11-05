@@ -115,10 +115,38 @@ frappe.ui.form.on("Item", {
 		['is_stock_item', 'has_serial_no', 'has_batch_no'].forEach((fieldname) => {
 			frm.set_df_property(fieldname, 'read_only', stock_exists);
 		});
+
+		// Ambil item price
+		let old_indicator_html = cur_frm.$wrapper.find(".indicator")[0].outerHTML;
+		if(!cur_frm.doc.__islocal || cur_frm.doc.__islocal == 0){
+			frappe.db.get_list("Item Price", {
+				fields: ["price_list", "price_list_rate"],
+				filters: {
+					item_code : frm.doc.item_code
+				}
+			}).then((res)=>{
+				frm.set_value("standard_selling_rate", 0);
+				frm.set_value("standard_buying_rate", 0);
+				res.forEach(item_price => {
+					if(item_price.price_list == "Standard Selling"){
+						frm.set_value("standard_selling_rate", item_price.price_list_rate)
+					}
+					if(item_price.price_list == "Standard Buying"){
+						frm.set_value("standard_buying_rate", item_price.price_list_rate)
+					}
+				});
+
+				cur_frm.$wrapper.find(".indicator")[0].outerHTML = old_indicator_html;
+			});
+		}
 	},
 
 	validate: function(frm){
 		erpnext.item.weight_to_validate(frm);
+	},
+
+	after_save: function(){
+		console.log("After Save Triggered");
 	},
 
 	image: function() {

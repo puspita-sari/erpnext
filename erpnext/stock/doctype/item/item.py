@@ -85,9 +85,30 @@ class Item(WebsiteGenerator):
 
 	def after_insert(self):
 		'''set opening stock and item price'''
-		if self.standard_rate:
-			for default in self.item_defaults:
-				self.add_price(default.default_price_list)
+		# if self.standard_rate:
+		# 	for default in self.item_defaults:
+		# 		self.add_price(default.default_price_list)
+
+		if self.standard_selling_rate:
+			item_price = frappe.get_doc({
+				"doctype": "Item Price",
+				"price_list": "Standard Selling",
+				"item_code": self.name,
+				"currency": erpnext.get_default_currency(),
+				"price_list_rate": self.standard_selling_rate
+			})
+			item_price.insert()
+		
+		if self.standard_buying_rate:
+			item_price = frappe.get_doc({
+				"doctype": "Item Price",
+				"price_list": "Standard Buying",
+				"item_code": self.name,
+				"currency": erpnext.get_default_currency(),
+				"price_list_rate": self.standard_buying_rate
+			})
+			item_price.insert()
+
 
 		if self.opening_stock:
 			self.set_opening_stock()
@@ -551,6 +572,51 @@ class Item(WebsiteGenerator):
 		frappe.db.sql("""update `tabItem Price` set item_name=%s,
 			item_description=%s, brand=%s where item_code=%s""",
                     (self.item_name, self.description, self.brand, self.name))
+		
+		if self.standard_selling_rate and self.standard_selling_rate > 0:
+			added = len(frappe.db.sql("""
+				SELECT name
+				FROM `tabItem Price`
+				where item_code='""" + self.name + """' and price_list = "Standard Selling"
+			""", as_dict=1)) > 0
+
+			if added:
+				frappe.db.sql("""
+					update `tabItem Price` set price_list_rate=""" + str(self.standard_selling_rate) + """
+					where item_code='""" + self.name + """' and price_list = "Standard Selling"
+				""")
+			else:
+				item_price = frappe.get_doc({
+					"doctype": "Item Price",
+					"price_list": "Standard Selling",
+					"item_code": self.name,
+					"currency": erpnext.get_default_currency(),
+					"price_list_rate": self.standard_selling_rate
+				})
+				item_price.insert()
+		
+		if self.standard_buying_rate and self.standard_buying_rate > 0:
+			added = len(frappe.db.sql("""
+				SELECT name
+				FROM `tabItem Price`
+				where item_code='""" + self.name + """' and price_list = "Standard Buying"
+			""", as_dict=1)) > 0
+
+			if added:
+				frappe.db.sql("""
+					update `tabItem Price` set price_list_rate=""" + str(self.standard_buying_rate) + """
+					where item_code='""" + self.name + """' and price_list = "Standard Buying"
+				""")
+			else:
+				item_price = frappe.get_doc({
+					"doctype": "Item Price",
+					"price_list": "Standard Buying",
+					"item_code": self.name,
+					"currency": erpnext.get_default_currency(),
+					"price_list_rate": self.standard_buying_rate
+				})
+				item_price.insert()
+
 
 	def on_trash(self):
 		super(Item, self).on_trash()

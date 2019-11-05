@@ -3,12 +3,12 @@
 * http://NeXTs.github.com/Clusterize.js/
 * Copyright (c) 2015 Denis Lukov; Licensed GPLv3 */
 
-;(function(name, definition) {
-    if (typeof module != 'undefined') module.exports = definition();
-    else if (typeof define == 'function' && typeof define.amd == 'object') define(definition);
-    else this[name] = definition();
-}('Clusterize', function() {
-  "use strict"
+// ;(function(name, definition) {
+//     if (typeof module != 'undefined') module.exports = definition();
+//     else if (typeof define == 'function' && typeof define.amd == 'object') define(definition);
+//     else this[name] = definition();
+// }('Clusterize', function() {
+//   "use strict"
 
   // detect ie9 and lower
   // https://gist.github.com/padolsey/527683#comment-786682
@@ -326,5 +326,5 @@
     return window.getComputedStyle ? window.getComputedStyle(elem)[prop] : elem.currentStyle[prop];
   }
 
-  return Clusterize;
-}));
+//   return Clusterize;
+// }));
