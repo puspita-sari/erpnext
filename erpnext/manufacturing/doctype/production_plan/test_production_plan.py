@@ -11,9 +11,11 @@ from erpnext.manufacturing.doctype.production_plan.production_plan import get_sa
 from erpnext.stock.doctype.stock_reconciliation.test_stock_reconciliation import create_stock_reconciliation
 from erpnext.selling.doctype.sales_order.test_sales_order import make_sales_order
 from erpnext.manufacturing.doctype.production_plan.production_plan import get_items_for_material_requests
+from erpnext.stock.doctype.purchase_receipt.test_purchase_receipt import set_perpetual_inventory
 
 class TestProductionPlan(unittest.TestCase):
 	def setUp(self):
+		set_perpetual_inventory(0)
 		for item in ['Test Production Item 1', 'Subassembly Item 1',
 			'Raw Material Item 1', 'Raw Material Item 2']:
 			create_item(item, valuation_rate=100)
@@ -51,7 +53,8 @@ class TestProductionPlan(unittest.TestCase):
 
 		for name in material_requests:
 			mr = frappe.get_doc('Material Request', name[0])
-			mr.cancel()
+			if mr.docstatus != 0:
+				mr.cancel()
 
 		for name in work_orders:
 			mr = frappe.delete_doc('Work Order', name[0])
@@ -143,12 +146,27 @@ class TestProductionPlan(unittest.TestCase):
 
 		self.assertEqual(sales_orders, [])
 
+	def test_pp_to_mr_customer_provided(self):
+		#Material Request from Production Plan for Customer Provided
+		create_item('CUST-0987', is_customer_provided_item = 1, customer = '_Test Customer', is_purchase_item = 0)
+		create_item('Production Item CUST')
+		for item, raw_materials in {'Production Item CUST': ['Raw Material Item 1', 'CUST-0987']}.items():
+			if not frappe.db.get_value('BOM', {'item': item}):
+				make_bom(item = item, raw_materials = raw_materials)
+		production_plan = create_production_plan(item_code = 'Production Item CUST')
+		production_plan.make_material_request()
+		material_request = frappe.db.get_value('Material Request Item', {'production_plan': production_plan.name, 'item_code': 'CUST-0987'}, 'parent')
+		mr = frappe.get_doc('Material Request', material_request)
+		self.assertTrue(mr.material_request_type, 'Customer Provided')
+		self.assertTrue(mr.customer, '_Test Customer')
+
 def create_production_plan(**args):
 	args = frappe._dict(args)
 
 	pln = frappe.get_doc({
 		'doctype': 'Production Plan',
 		'company': args.company or '_Test Company',
+		'customer': args.customer or '_Test Customer',
 		'posting_date': nowdate(),
 		'include_non_stock_items': args.include_non_stock_items or 1,
 		'include_subcontracted_items': args.include_subcontracted_items or 1,

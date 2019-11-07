@@ -17,11 +17,11 @@ from erpnext.manufacturing.doctype.production_plan.test_production_plan import m
 
 class TestWorkOrder(unittest.TestCase):
 	def setUp(self):
+		set_perpetual_inventory(0)
 		self.warehouse = '_Test Warehouse 2 - _TC'
 		self.item = '_Test Item'
 
 	def check_planned_qty(self):
-		set_perpetual_inventory(0)
 
 		planned0 = frappe.db.get_value("Bin", {"item_code": "_Test FG Item",
 			"warehouse": "_Test Warehouse 1 - _TC"}, "planned_qty") or 0
@@ -312,7 +312,7 @@ class TestWorkOrder(unittest.TestCase):
 			bom_doc = frappe.get_doc('BOM', bom)
 			work_order = make_wo_order_test_record(item=bom_item, qty=1, bom_no=bom)
 
-			job_cards = frappe.get_all('Job Card', filters = {'work_order': work_order})
+			job_cards = frappe.get_all('Job Card', filters = {'work_order': work_order.name})
 			self.assertEqual(len(job_cards), len(bom_doc.operations))
 
 	def test_work_order_with_non_transfer_item(self):

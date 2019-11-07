@@ -4,8 +4,8 @@ import frappe, json, os
 from frappe.utils import flt, cstr
 from erpnext.controllers.taxes_and_totals import get_itemised_tax
 from frappe import _
+from frappe.core.doctype.file.file import remove_file
 from six import string_types
-from frappe.utils.file_manager import save_file, remove_file
 from frappe.desk.form.load import get_attachments
 from erpnext.regional.italy import state_codes
 
@@ -176,6 +176,10 @@ def get_invoice_summary(items, taxes):
 						summary_data[key]["tax_exemption_reason"] = tax.tax_exemption_reason
 						summary_data[key]["tax_exemption_law"] = tax.tax_exemption_law
 
+			if summary_data.get("0.0") and tax.charge_type in ["On Previous Row Total",
+				"On Previous Row Amount"]:
+				summary_data[key]["taxable_amount"] = tax.total
+
 			if summary_data == {}: #Implies that Zero VAT has not been set on any item.
 				summary_data.setdefault("0.0", {"tax_amount": 0.0, "taxable_amount": tax.total,
 					"tax_exemption_reason": tax.tax_exemption_reason, "tax_exemption_law": tax.tax_exemption_law})
@@ -278,11 +282,25 @@ def prepare_and_attach_invoice(doc, replace=False):
 	progressive_name, progressive_number = get_progressive_name_and_number(doc, replace)
 
 	invoice = prepare_invoice(doc, progressive_number)
-	invoice_xml = frappe.render_template('erpnext/regional/italy/e-invoice.xml', context={"doc": invoice}, is_path=True)
+	item_meta = frappe.get_meta("Sales Invoice Item")
+
+	invoice_xml = frappe.render_template('erpnext/regional/italy/e-invoice.xml',
+		context={"doc": invoice, "item_meta": item_meta}, is_path=True)
+
 	invoice_xml = invoice_xml.replace("&", "&amp;")
 
 	xml_filename = progressive_name + ".xml"
-	return save_file(xml_filename, invoice_xml, dt=doc.doctype, dn=doc.name, is_private=True)
+
+	_file = frappe.get_doc({
+		"doctype": "File",
+		"file_name": xml_filename,
+		"attached_to_doctype": doc.doctype,
+		"attached_to_name": doc.name,
+		"is_private": True,
+		"content": invoice_xml
+	})
+	_file.save()
+	return _file
 
 @frappe.whitelist()
 def generate_single_invoice(docname):

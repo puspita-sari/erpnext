@@ -3,17 +3,22 @@
 
 from __future__ import unicode_literals
 import frappe, erpnext
-from frappe.utils import flt, cstr, cint
+from frappe.utils import flt, cstr, cint, comma_and
 from frappe import _
+from erpnext.accounts.utils import get_stock_and_account_balance
 from frappe.model.meta import get_field_precision
 from erpnext.accounts.doctype.budget.budget import validate_expense_against_budget
+from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import get_accounting_dimensions
 
 
+class ClosedAccountingPeriod(frappe.ValidationError): pass
 class StockAccountInvalidTransaction(frappe.ValidationError): pass
+class StockValueAndAccountBalanceOutOfSync(frappe.ValidationError): pass
 
 def make_gl_entries(gl_map, cancel=False, adv_adj=False, merge_entries=True, update_outstanding='Yes', from_repost=False):
 	if gl_map:
 		if not cancel:
+			validate_accounting_period(gl_map)
 			gl_map = process_gl_map(gl_map, merge_entries)
 			if gl_map and len(gl_map) > 1:
 				save_entries(gl_map, adv_adj, update_outstanding, from_repost)
@@ -21,6 +26,27 @@ def make_gl_entries(gl_map, cancel=False, adv_adj=False, merge_entries=True, upd
 				frappe.throw(_("Incorrect number of General Ledger Entries found. You might have selected a wrong Account in the transaction."))
 		else:
 			delete_gl_entries(gl_map, adv_adj=adv_adj, update_outstanding=update_outstanding)
+
+def validate_accounting_period(gl_map):
+	accounting_periods = frappe.db.sql(""" SELECT
+			ap.name as name
+		FROM
+			`tabAccounting Period` ap, `tabClosed Document` cd
+		WHERE
+			ap.name = cd.parent
+			AND ap.company = %(company)s
+			AND cd.closed = 1
+			AND cd.document_type = %(voucher_type)s
+			AND %(date)s between ap.start_date and ap.end_date
+			""", {
+				'date': gl_map[0].posting_date,
+				'company': gl_map[0].company,
+				'voucher_type': gl_map[0].voucher_type
+			}, as_dict=1)
+
+	if accounting_periods:
+		frappe.throw(_("You can't create accounting entries in the closed accounting period {0}")
+			.format(accounting_periods[0].name), ClosedAccountingPeriod)
 
 def process_gl_map(gl_map, merge_entries=True):
 	if merge_entries:
@@ -49,10 +75,11 @@ def process_gl_map(gl_map, merge_entries=True):
 
 def merge_similar_entries(gl_map):
 	merged_gl_map = []
+	accounting_dimensions = get_accounting_dimensions()
 	for entry in gl_map:
 		# if there is already an entry in this account then just add it
 		# to that entry
-		same_head = check_if_in_list(entry, merged_gl_map)
+		same_head = check_if_in_list(entry, merged_gl_map, accounting_dimensions)
 		if same_head:
 			same_head.debit	= flt(same_head.debit) + flt(entry.debit)
 			same_head.debit_in_account_currency	= \
@@ -69,29 +96,40 @@ def merge_similar_entries(gl_map):
 
 	return merged_gl_map
 
-def check_if_in_list(gle, gl_map):
+def check_if_in_list(gle, gl_map, dimensions=None):
+	account_head_fieldnames = ['party_type', 'party', 'against_voucher', 'against_voucher_type',
+		'cost_center', 'project']
+
+	if dimensions:
+		account_head_fieldnames = account_head_fieldnames + dimensions
+
 	for e in gl_map:
-		if e.account == gle.account \
-			and cstr(e.get('party_type'))==cstr(gle.get('party_type')) \
-			and cstr(e.get('party'))==cstr(gle.get('party')) \
-			and cstr(e.get('against_voucher'))==cstr(gle.get('against_voucher')) \
-			and cstr(e.get('against_voucher_type')) == cstr(gle.get('against_voucher_type')) \
-			and cstr(e.get('cost_center')) == cstr(gle.get('cost_center')) \
-			and cstr(e.get('project')) == cstr(gle.get('project')):
-				return e
+		same_head = True
+		if e.account != gle.account:
+			same_head = False
+
+		for fieldname in account_head_fieldnames:
+			if cstr(e.get(fieldname)) != cstr(gle.get(fieldname)):
+				same_head = False
+
+		if same_head:
+			return e
 
 def save_entries(gl_map, adv_adj, update_outstanding, from_repost=False):
 	if not from_repost:
-		validate_account_for_perpetual_inventory(gl_map)
+		validate_cwip_accounts(gl_map)
 
 	round_off_debit_credit(gl_map)
-
 	for entry in gl_map:
 		make_entry(entry, adv_adj, update_outstanding, from_repost)
 
 		# check against budget
 		if not from_repost:
 			validate_expense_against_budget(entry)
+
+	if not from_repost:
+		validate_account_for_perpetual_inventory(gl_map)
+
 
 def make_entry(args, adv_adj, update_outstanding, from_repost=False):
 	args.update({"doctype": "GL Entry"})
@@ -103,15 +141,41 @@ def make_entry(args, adv_adj, update_outstanding, from_repost=False):
 	gle.submit()
 
 def validate_account_for_perpetual_inventory(gl_map):
-	if cint(erpnext.is_perpetual_inventory_enabled(gl_map[0].company)) \
-		and gl_map[0].voucher_type=="Journal Entry":
-			aii_accounts = [d[0] for d in frappe.db.sql("""select name from tabAccount
-				where account_type = 'Stock' and is_group=0""")]
+	if cint(erpnext.is_perpetual_inventory_enabled(gl_map[0].company)):
+		account_list = [gl_entries.account for gl_entries in gl_map]
+
+		aii_accounts = [d.name for d in frappe.get_all("Account",
+			filters={'account_type': 'Stock', 'is_group': 0, 'company': gl_map[0].company})]
+
+		for account in account_list:
+			if account not in aii_accounts:
+				continue
+
+			account_bal, stock_bal, warehouse_list = get_stock_and_account_balance(account,
+				gl_map[0].posting_date, gl_map[0].company)
+
+			if gl_map[0].voucher_type=="Journal Entry":
+				# In case of Journal Entry, there are no corresponding SL entries,
+				# hence deducting currency amount
+				account_bal -= flt(gl_map[0].debit) - flt(gl_map[0].credit)
+				if account_bal == stock_bal:
+					frappe.throw(_("Account: {0} can only be updated via Stock Transactions")
+						.format(account), StockAccountInvalidTransaction)
+
+			elif account_bal != stock_bal:
+				frappe.throw(_("Account Balance ({0}) and Stock Value ({1}) is out of sync for account {2} and linked warehouse ({3}). Please create adjustment Journal Entry for amount {4}.")
+					.format(account_bal, stock_bal, account, comma_and(warehouse_list), stock_bal - account_bal),
+					StockValueAndAccountBalanceOutOfSync)
+
+def validate_cwip_accounts(gl_map):
+	if not cint(frappe.db.get_value("Asset Settings", None, "disable_cwip_accounting")) \
+		and gl_map[0].voucher_type == "Journal Entry":
+			cwip_accounts = [d[0] for d in frappe.db.sql("""select name from tabAccount
+				where account_type = 'Capital Work in Progress' and is_group=0""")]
 
 			for entry in gl_map:
-				if entry.account in aii_accounts:
-					frappe.throw(_("Account: {0} can only be updated via Stock Transactions")
-						.format(entry.account), StockAccountInvalidTransaction)
+				if entry.account in cwip_accounts:
+					frappe.throw(_("Account: <b>{0}</b> is capital Work in progress and can not be updated by Journal Entry").format(entry.account))
 
 def round_off_debit_credit(gl_map):
 	precision = get_field_precision(frappe.get_meta("GL Entry").get_field("debit"),

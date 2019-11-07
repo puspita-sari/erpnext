@@ -1,7 +1,6 @@
-cur_frm.add_fetch("payment_gateway", "payment_account", "payment_account")
-cur_frm.add_fetch("payment_gateway", "payment_gateway", "payment_gateway")
-cur_frm.add_fetch("payment_gateway", "message", "message")
-cur_frm.add_fetch("payment_gateway", "payment_url_message", "payment_url_message")
+cur_frm.add_fetch("payment_gateway_account", "payment_account", "payment_account")
+cur_frm.add_fetch("payment_gateway_account", "payment_gateway", "payment_gateway")
+cur_frm.add_fetch("payment_gateway_account", "message", "message")
 
 frappe.ui.form.on("Payment Request", "onload", function(frm, dt, dn){
 	if (frm.doc.reference_doctype) {
@@ -34,7 +33,7 @@ frappe.ui.form.on("Payment Request", "refresh", function(frm) {
 	}
 
 	if(!frm.doc.payment_gateway_account && frm.doc.status == "Initiated") {
-		frm.add_custom_button(__('Make Payment Entry'), function(){
+		frm.add_custom_button(__('Create Payment Entry'), function(){
 			frappe.call({
 				method: "erpnext.accounts.doctype.payment_request.payment_request.make_payment_entry",
 				args: {"docname": frm.doc.name},

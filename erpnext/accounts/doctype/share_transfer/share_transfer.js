@@ -16,8 +16,8 @@ frappe.ui.form.on('Share Transfer', {
 				};
 			};
 		});
-		if (frm.doc.docstatus == 1) {
-			frm.add_custom_button(__('Make Journal Entry'), function () {
+		if (frm.doc.docstatus == 1 && frm.doc.equity_or_liability_account && frm.doc.asset_account) {
+			frm.add_custom_button(__('Create Journal Entry'), function () {
 				erpnext.share_transfer.make_jv(frm);
 			});
 		}
