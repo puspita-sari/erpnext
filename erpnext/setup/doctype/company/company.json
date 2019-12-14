@@ -59,6 +59,7 @@
   "default_deferred_expense_account",
   "default_payroll_payable_account",
   "default_expense_claim_payable_account",
+  "default_retained_earning_account",
   "section_break_22",
   "cost_center",
   "column_break_26",
@@ -720,12 +721,18 @@
    "fieldtype": "Link",
    "label": "Default Buying Terms",
    "options": "Terms and Conditions"
+  },
+  {
+   "fieldname": "default_retained_earning_account",
+   "fieldtype": "Link",
+   "label": "Default Retained Earning Account",
+   "options": "Account"
   }
  ],
  "icon": "fa fa-building",
  "idx": 1,
  "image_field": "company_logo",
- "modified": "2019-07-04 22:20:45.104307",
+ "modified": "2019-12-02 22:04:49.612330",
  "modified_by": "Administrator",
  "module": "Setup",
  "name": "Company",

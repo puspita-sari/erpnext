@@ -63,10 +63,11 @@ def make_dimension_in_accounting_doctypes(doc):
 			"insert_after": insert_after_field
 		}
 
-		if doctype == "Budget":
-			add_dimension_to_budget_doctype(df, doc)
-		else:
-			create_custom_field(doctype, df)
+		if frappe.db.exists("DocType", doctype):
+			if doctype == "Budget":
+				add_dimension_to_budget_doctype(df, doc)
+			else:
+				create_custom_field(doctype, df)
 
 		count += 1
 
@@ -161,7 +162,7 @@ def get_doctypes_with_dimensions():
 		"Stock Entry Detail", "Payment Entry Deduction", "Sales Taxes and Charges", "Purchase Taxes and Charges", "Shipping Rule",
 		"Landed Cost Item", "Asset Value Adjustment", "Loyalty Program", "Fee Schedule", "Fee Structure", "Stock Reconciliation",
 		"Travel Request", "Fees", "POS Profile", "Opening Invoice Creation Tool", "Opening Invoice Creation Tool Item", "Subscription",
-		"Subscription Plan"]
+		"Subscription Plan", "Cash Book", "Cash Book Account", "AP Invoice Entry", "AP Invoice Account", "AP Payment Entry"]
 
 	return doclist
 
@@ -188,12 +189,16 @@ def get_dimension_filters():
 		WHERE disabled = 0
 	""", as_dict=1)
 
-	default_dimensions = frappe.db.sql("""SELECT parent, company, default_dimension
-		FROM `tabAccounting Dimension Detail`""", as_dict=1)
+	default_dimensions = frappe.db.sql("""
+		SELECT `tabAccounting Dimension Detail`.parent, company, default_dimension,
+		`tabAccounting Dimension`.document_type
+		FROM `tabAccounting Dimension Detail`
+		JOIN `tabAccounting Dimension` ON `tabAccounting Dimension`.name = `tabAccounting Dimension Detail`.parent
+	""", as_dict=1)
 
 	default_dimensions_map = {}
 	for dimension in default_dimensions:
 		default_dimensions_map.setdefault(dimension['company'], {})
-		default_dimensions_map[dimension['company']][dimension['parent']] = dimension['default_dimension']
+		default_dimensions_map[dimension['company']][dimension['document_type']] = dimension['default_dimension']
 
 	return dimension_filters, default_dimensions_map

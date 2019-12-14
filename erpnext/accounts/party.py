@@ -44,6 +44,7 @@ def _get_party_details(party=None, account=None, party_type="Customer", company=
 		frappe.throw(_("Not permitted for {0}").format(party), frappe.PermissionError)
 
 	party = frappe.get_doc(party_type, party)
+	out["party_dict"] = party.as_dict()
 	currency = party.default_currency if party.get("default_currency") else get_company_currency(company)
 
 	party_address, shipping_address = set_address_details(out, party, party_type, doctype, company, party_address, shipping_address)
@@ -179,7 +180,7 @@ def set_price_list(out, party, party_type, given_price_list, pos=None):
 
 
 def set_account_and_due_date(party, account, party_type, company, posting_date, bill_date, doctype):
-	if doctype not in ["Sales Invoice", "Purchase Invoice"]:
+	if doctype not in ["Sales Invoice", "Purchase Invoice", "AP Invoice Entry"]:
 		# not an invoice
 		return {
 			party_type.lower(): party

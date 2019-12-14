@@ -1,5 +1,15 @@
 // Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 // License: GNU General Public License v3. See license.txt
+ap_settings = {};
+frappe.call({
+    method: "frappe.client.get",
+    type: 'GET',
+    args: { doctype: "AP Settings", name: "AP Settings", filters:null },
+	async: false,
+    callback: r => {
+        if(r.message) ap_settings = r.message;
+    }
+})
 
 frappe.query_reports["Accounts Payable"] = {
 	"filters": [
@@ -16,7 +26,7 @@ frappe.query_reports["Accounts Payable"] = {
 			"label": __("Ageing Based On"),
 			"fieldtype": "Select",
 			"options": 'Posting Date\nDue Date\nSupplier Invoice Date',
-			"default": "Posting Date"
+			"default": ap_settings.aging_based_on || "Posting Date"
 		},
 		{
 			"fieldname":"report_date",
@@ -28,28 +38,28 @@ frappe.query_reports["Accounts Payable"] = {
 			"fieldname":"range1",
 			"label": __("Ageing Range 1"),
 			"fieldtype": "Int",
-			"default": "30",
+			"default": ap_settings.default_aging_range_1 || 30,
 			"reqd": 1
 		},
 		{
 			"fieldname":"range2",
 			"label": __("Ageing Range 2"),
 			"fieldtype": "Int",
-			"default": "60",
+			"default": ap_settings.default_aging_range_2 || 60,
 			"reqd": 1
 		},
 		{
 			"fieldname":"range3",
 			"label": __("Ageing Range 3"),
 			"fieldtype": "Int",
-			"default": "90",
+			"default": ap_settings.default_aging_range_3 || 90,
 			"reqd": 1
 		},
 		{
 			"fieldname":"range4",
 			"label": __("Ageing Range 4"),
 			"fieldtype": "Int",
-			"default": "120",
+			"default": ap_settings.default_aging_range_4 || 120,
 			"reqd": 1
 		},
 		{

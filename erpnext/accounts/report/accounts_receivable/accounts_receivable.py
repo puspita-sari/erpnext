@@ -131,6 +131,8 @@ class ReceivablePayableReport(object):
 	def get_voucher_balance(self, gle):
 		voucher_balance = None
 
+		
+
 		if gle.against_voucher:
 			# find invoice
 			against_voucher = gle.against_voucher
@@ -138,8 +140,10 @@ class ReceivablePayableReport(object):
 			# If payment is made against credit note
 			# and credit note is made against a Sales Invoice
 			# then consider the payment against original sales invoice.
-			if gle.against_voucher_type in ('Sales Invoice', 'Purchase Invoice'):
+			if gle.against_voucher_type in ('Sales Invoice', 'Purchase Invoice', "AP Invoice Entry"):
+				
 				if gle.against_voucher in self.return_entries:
+					
 					return_against = self.return_entries.get(gle.against_voucher)
 					if return_against:
 						against_voucher = return_against
@@ -252,6 +256,13 @@ class ReceivablePayableReport(object):
 			for pi in frappe.db.sql("""
 				select name, due_date, bill_no, bill_date
 				from `tabPurchase Invoice`
+				where posting_date <= %s
+			""", self.filters.report_date, as_dict=1):
+				self.invoice_details.setdefault(pi.name, pi)
+			
+			for pi in frappe.db.sql("""
+				select name, due_date, null as bill_no, null as bill_date
+				from `tabAP Invoice Entry`
 				where posting_date <= %s
 			""", self.filters.report_date, as_dict=1):
 				self.invoice_details.setdefault(pi.name, pi)
@@ -436,7 +447,8 @@ class ReceivablePayableReport(object):
 			row.future_ref = ', '.join(row.future_ref)
 
 	def get_return_entries(self):
-		doctype = "Sales Invoice" if self.party_type == "Customer" else "Purchase Invoice"
+		doctypes = ["Sales Invoice"] if self.party_type == "Customer" else ["Purchase Invoice", "AP Invoice Entry"]
+
 		filters={
 			'is_return': 1,
 			'docstatus': 1
@@ -444,9 +456,12 @@ class ReceivablePayableReport(object):
 		party_field = scrub(self.filters.party_type)
 		if self.filters.get(party_field):
 			filters.update({party_field: self.filters.get(party_field)})
-		self.return_entries = frappe._dict(
-			frappe.get_all(doctype, filters, ['name', 'return_against'], as_list=1)
-		)
+		self.return_entries = {}
+
+		for doctype in doctypes:
+			ret_inv = frappe.get_all(doctype, filters, ['name', 'return_against'])
+			for inv in ret_inv:
+				self.return_entries[inv["name"]] = inv["return_against"]
 
 	def set_ageing(self, row):
 		if self.filters.ageing_based_on == "Due Date":
@@ -460,11 +475,11 @@ class ReceivablePayableReport(object):
 
 		# ageing buckets should not have amounts if due date is not reached
 		if getdate(entry_date) > getdate(self.filters.report_date):
-			row.range1 = row.range2 = row.range3 = row.range4 = row.range5 = 0.0
+			row.range2 = row.range3 = row.range4 = row.range5 = row.range6 = 0.0
 
 	def get_ageing_data(self, entry_date, row):
 		# [0-30, 30-60, 60-90, 90-120, 120-above]
-		row.range1 = row.range2 = row.range3 = row.range4 = range5 = 0.0
+		row.range1 = row.range2 = row.range3 = row.range4 = row.range5 = row.range6 = 0.0
 
 		if not (self.age_as_on and entry_date):
 			return
@@ -475,7 +490,7 @@ class ReceivablePayableReport(object):
 		if not (self.filters.range1 and self.filters.range2 and self.filters.range3 and self.filters.range4):
 			self.filters.range1, self.filters.range2, self.filters.range3, self.filters.range4 = 30, 60, 90, 120
 
-		for i, days in enumerate([self.filters.range1, self.filters.range2, self.filters.range3, self.filters.range4]):
+		for i, days in enumerate([0, self.filters.range1, self.filters.range2, self.filters.range3, self.filters.range4]):
 			if row.age <= days:
 				index = i
 				break
@@ -507,6 +522,7 @@ class ReceivablePayableReport(object):
 				{1}
 			order by posting_date, party"""
 			.format(select_fields, conditions), values, as_dict=True)
+		
 
 	def prepare_conditions(self):
 		conditions = [""]
@@ -606,7 +622,7 @@ class ReceivablePayableReport(object):
 		return gle.get('debit' if self.dr_or_cr=='credit' else 'credit')
 
 	def is_invoice(self, gle):
-		if gle.voucher_type in ('Sales Invoice', 'Purchase Invoice'):
+		if gle.voucher_type in ('Sales Invoice', 'Purchase Invoice', 'AP Invoice Entry'):
 			return True
 
 	def get_party_details(self, party):
@@ -703,7 +719,8 @@ class ReceivablePayableReport(object):
 		self.ageing_column_labels = []
 		self.add_column(label=_('Age (Days)'), fieldname='age', fieldtype='Int', width=80)
 
-		for i, label in enumerate(["0-{range1}".format(range1=self.filters["range1"]),
+		for i, label in enumerate(["Not Yet Due",
+			"0-{range1}".format(range1=self.filters["range1"]),
 			"{range1}-{range2}".format(range1=cint(self.filters["range1"])+ 1, range2=self.filters["range2"]),
 			"{range2}-{range3}".format(range2=cint(self.filters["range2"])+ 1, range3=self.filters["range3"]),
 			"{range3}-{range4}".format(range3=cint(self.filters["range3"])+ 1, range4=self.filters["range4"]),
@@ -714,7 +731,7 @@ class ReceivablePayableReport(object):
 	def get_chart_data(self):
 		rows = []
 		for row in self.data:
-			values = [row.range1, row.range2, row.range3, row.range4, row.range5]
+			values = [row.range1, row.range2, row.range3, row.range4, row.range5, row.range6]
 			precision = cint(frappe.db.get_default("float_precision")) or 2
 			rows.append({
 				'values': [flt(val, precision) for val in values]
