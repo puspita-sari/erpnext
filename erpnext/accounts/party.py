@@ -180,7 +180,7 @@ def set_price_list(out, party, party_type, given_price_list, pos=None):
 
 
 def set_account_and_due_date(party, account, party_type, company, posting_date, bill_date, doctype):
-	if doctype not in ["Sales Invoice", "Purchase Invoice", "AP Invoice Entry"]:
+	if doctype not in ["Sales Invoice", "Purchase Invoice", "AP Invoice Entry", "AR Invoice Entry"]:
 		# not an invoice
 		return {
 			party_type.lower(): party

@@ -32,6 +32,22 @@ frappe.ui.form.on(cur_frm.doctype, {
 				}
 			});
 
+			frm.set_query("prepaid_tax_account", "taxes", function(doc) {
+				if(frm.cscript.tax_table == "Sales Taxes and Charges") {
+					var account_type = ["Tax", "Chargeable", "Expense Account"];
+				} else {
+					var account_type = ["Tax", "Chargeable", "Income Account", "Expenses Included In Valuation"];
+				}
+
+				return {
+					query: "erpnext.controllers.queries.tax_account_query",
+					filters: {
+						"account_type": account_type,
+						"company": doc.company
+					}
+				}
+			});
+
 			frm.set_query("cost_center", "taxes", function(doc) {
 				return {
 					filters: {

@@ -25,6 +25,14 @@ frappe.ui.form.on("Supplier", {
 			}
 		});
 	},
+	onload: function(frm){
+		frm.set_query("alamat_pajak", function() {
+			return {
+				query: 'frappe.contacts.doctype.address.address.address_query',
+				filters: { link_doctype: 'Supplier', link_name: frm.doc.name }
+			};
+		});
+	},
 	refresh: function (frm) {
 		frappe.dynamic_link = { doc: frm.doc, fieldname: 'name', doctype: 'Supplier' }
 

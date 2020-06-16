@@ -599,7 +599,7 @@ class Item(WebsiteGenerator):
 			item_description=%s, brand=%s where item_code=%s""",
                     (self.item_name, self.description, self.brand, self.name))
 		
-		if self.standard_selling_rate and self.standard_selling_rate > 0:
+		if self.get("standard_selling_rate") and self.standard_selling_rate > 0:
 			added = len(frappe.db.sql("""
 				SELECT name
 				FROM `tabItem Price`
@@ -621,7 +621,7 @@ class Item(WebsiteGenerator):
 				})
 				item_price.insert()
 		
-		if self.standard_buying_rate and self.standard_buying_rate > 0:
+		if self.get("standard_buying_rate") and self.standard_buying_rate > 0:
 			added = len(frappe.db.sql("""
 				SELECT name
 				FROM `tabItem Price`

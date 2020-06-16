@@ -1073,7 +1073,7 @@ def update_invoice_status():
 
 
 @frappe.whitelist()
-def get_payment_terms(terms_template, posting_date=None, grand_total=None, bill_date=None):
+def get_payment_terms(terms_template, posting_date=None, reservation_date=None, grand_total=None, bill_date=None, total=None):
 	if not terms_template:
 		return
 
@@ -1081,35 +1081,52 @@ def get_payment_terms(terms_template, posting_date=None, grand_total=None, bill_
 
 	schedule = []
 	for d in terms_doc.get("terms"):
-		term_details = get_payment_term_details(d, posting_date, grand_total, bill_date)
+		term_details = get_payment_term_details(d, posting_date, reservation_date, grand_total, bill_date, total, terms_doc.get("term_type", "Percentage"))
+		if d.get("transaction_type"):
+			term_details["transaction_type"] = d.get("transaction_type")
+		if d.get("tax_template"):
+			from erpnext.controllers.accounts_controller import get_taxes_and_charges
+			term_details["tax_template"] = d.get("tax_template")
+			taxes = get_taxes_and_charges(master_doctype="Sales Taxes and Charges Template", master_name=d.get("tax_template"))
+			if taxes: term_details["tax_data"] = json.dumps(taxes)
+		
 		schedule.append(term_details)
 
 	return schedule
 
 
 @frappe.whitelist()
-def get_payment_term_details(term, posting_date=None, grand_total=None, bill_date=None):
+def get_payment_term_details(term, posting_date=None, reservation_date=None, grand_total=None, bill_date=None, total=None, term_type=None):
 	term_details = frappe._dict()
 	if isinstance(term, text_type):
 		term = frappe.get_doc("Payment Term", term)
 	else:
 		term_details.payment_term = term.payment_term
 	term_details.description = term.description
-	term_details.invoice_portion = term.invoice_portion
-	term_details.payment_amount = flt(term.invoice_portion) * flt(grand_total) / 100
-	if bill_date:
-		term_details.due_date = get_due_date(term, bill_date)
-	elif posting_date:
-		term_details.due_date = get_due_date(term, posting_date)
 
-	if getdate(term_details.due_date) < getdate(posting_date):
-		term_details.due_date = posting_date
+	if term_type == "Percentage":
+		term_details.payment_amount = flt(term.invoice_portion) * flt(grand_total) / 100
+		if total:
+			term_details.net_payment_amount = flt(term.invoice_portion) * flt(total) / 100
+	else:
+		term_details.invoice_portion = term.fixed_amount / flt(grand_total) * 100
+		term_details.payment_amount = term.fixed_amount
+		if total:
+			term_details.net_payment_amount = flt(term_details.invoice_portion) * flt(total) / 100
+
+	if bill_date:
+		term_details.due_date = get_due_date(term, bill_date=bill_date, reservation_date=reservation_date)
+	elif posting_date:
+		term_details.due_date = get_due_date(term, posting_date=posting_date, reservation_date=reservation_date)
+
+	# if getdate(term_details.due_date) < getdate(posting_date):
+	# 	term_details.due_date = posting_date
 	term_details.mode_of_payment = term.mode_of_payment
 
 	return term_details
 
 
-def get_due_date(term, posting_date=None, bill_date=None):
+def get_due_date(term, posting_date=None, bill_date=None, reservation_date=None):
 	due_date = None
 	date = bill_date or posting_date
 	if term.due_date_based_on == "Day(s) after invoice date":
@@ -1118,6 +1135,10 @@ def get_due_date(term, posting_date=None, bill_date=None):
 		due_date = add_days(get_last_day(date), term.credit_days)
 	elif term.due_date_based_on == "Month(s) after the end of the invoice month":
 		due_date = add_months(get_last_day(date), term.credit_months)
+	elif term.due_date_based_on == "Day(s) before reservation date":
+		date = reservation_date
+		due_date = add_days(date, term.credit_days * -1)
+
 	return due_date
 
 

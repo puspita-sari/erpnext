@@ -656,9 +656,9 @@ class ReceivablePayableReport(object):
 			options='voucher_type', width=180)
 		self.add_column(label='Due Date', fieldtype='Date')
 
-		if self.party_type == "Supplier":
-			self.add_column(label=_('Bill No'), fieldname='bill_no', fieldtype='Data')
-			self.add_column(label=_('Bill Date'), fieldname='bill_date', fieldtype='Date')
+		# if self.party_type == "Supplier":
+		# 	self.add_column(label=_('Bill No'), fieldname='bill_no', fieldtype='Data')
+		# 	self.add_column(label=_('Bill Date'), fieldname='bill_date', fieldtype='Date')
 
 		if self.filters.based_on_payment_terms:
 			self.add_column(label=_('Payment Term'), fieldname='payment_term', fieldtype='Data')

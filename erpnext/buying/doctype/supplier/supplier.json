@@ -14,9 +14,6 @@
   "supplier_name",
   "country",
   "default_bank_account",
-  "tax_id",
-  "tax_category",
-  "tax_withholding_category",
   "is_transporter",
   "is_internal_supplier",
   "represents_company",
@@ -51,6 +48,12 @@
   "default_payable_accounts",
   "accounts",
   "default_tax_withholding_config",
+  "tax_details_section",
+  "tax_category",
+  "tax_withholding_category",
+  "column_break_43",
+  "npwp",
+  "alamat_pajak",
   "column_break2",
   "website",
   "supplier_details",
@@ -97,11 +100,6 @@
    "fieldtype": "Link",
    "label": "Default Bank Account",
    "options": "Bank Account"
-  },
-  {
-   "fieldname": "tax_id",
-   "fieldtype": "Data",
-   "label": "Tax ID"
   },
   {
    "fieldname": "tax_category",
@@ -371,12 +369,32 @@
    "fieldtype": "Link",
    "label": "Default Credit Term",
    "options": "Credit Term"
+  },
+  {
+   "fieldname": "npwp",
+   "fieldtype": "Data",
+   "label": "NPWP"
+  },
+  {
+   "fieldname": "tax_details_section",
+   "fieldtype": "Section Break",
+   "label": "Tax Details"
+  },
+  {
+   "fieldname": "column_break_43",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "alamat_pajak",
+   "fieldtype": "Link",
+   "label": "Alamat Pajak",
+   "options": "Address"
   }
  ],
  "icon": "fa fa-user",
  "idx": 370,
  "image_field": "image",
- "modified": "2019-11-09 20:10:21.084205",
+ "modified": "2020-01-31 13:30:58.777848",
  "modified_by": "Administrator",
  "module": "Buying",
  "name": "Supplier",

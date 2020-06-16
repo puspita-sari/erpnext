@@ -4,7 +4,7 @@ erpnext.doctypes_with_dimensions = ["GL Entry", "Sales Invoice", "Purchase Invoi
 	"Expense Claim", "Stock Entry", "Budget", "Payroll Entry", "Delivery Note", "Shipping Rule", "Loyalty Program",
 	"Fee Schedule", "Fee Structure", "Stock Reconciliation", "Travel Request", "Fees", "POS Profile", "Opening Invoice Creation Tool",
 	"Subscription", "Purchase Order", "Journal Entry", "Material Request", "Purchase Receipt", "Landed Cost Item", "Asset",
-	"Cash Book", "AP Invoice Entry", "AP Payment Entry"];
+	"Cash Book", "AP Invoice Entry", "AP Payment Entry", "AR Invoice Entry"];
 
 erpnext.child_docs = ["Sales Invoice Item", "Purchase Invoice Item", "Purchase Order Item", "Journal Entry Account",
 	"Material Request Item", "Delivery Note Item", "Purchase Receipt Item", "Stock Entry Detail", "Payment Entry Deduction",

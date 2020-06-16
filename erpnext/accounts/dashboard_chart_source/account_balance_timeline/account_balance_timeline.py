@@ -48,6 +48,9 @@ def get(chart_name = None, chart = None, no_cache = None, from_date = None, to_d
 		"datasets": [{
 			"name": account,
 			"values": [r[1] for r in result]
+		},{
+			"name": account + "zzzz",
+			"values": [(r[1]*2) for r in result]
 		}]
 	}
 

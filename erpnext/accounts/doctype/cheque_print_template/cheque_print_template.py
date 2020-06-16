@@ -12,19 +12,9 @@ class ChequePrintTemplate(Document):
 
 @frappe.whitelist()
 def create_or_update_cheque_print_format(template_name):
-	if not frappe.db.exists("Print Format", template_name):
-		cheque_print = frappe.new_doc("Print Format")
-		cheque_print.update({
-			"doc_type": "Payment Entry",
-			"standard": "No",
-			"custom_format": 1,
-			"print_format_type": "Jinja",
-			"name": template_name
-		})
-	else:
-		cheque_print = frappe.get_doc("Print Format", template_name)
 
 	doc = frappe.get_doc("Cheque Print Template", template_name)
+	cheque_print = frappe.get_doc("Print Format", doc.print_format)
 
 	cheque_print.html = """
 <style>
@@ -45,7 +35,7 @@ def create_or_update_cheque_print_format(template_name):
 		</span>
 		<span style="top:%(date_dist_from_top_edge)scm; left:%(date_dist_from_left_edge)scm;
 			position: absolute;">
-			{{ frappe.utils.formatdate(doc.reference_date) or '' }}
+			{{ frappe.utils.formatdate(doc.get("reference_date", doc.posting_date)) or '' }}
 		</span>
 		<span style="top:%(acc_no_dist_from_top_edge)scm;left:%(acc_no_dist_from_left_edge)scm;
 			position: absolute;  min-width: 6cm;">
@@ -53,16 +43,16 @@ def create_or_update_cheque_print_format(template_name):
 		</span>
 		<span style="top:%(payer_name_from_top_edge)scm;left: %(payer_name_from_left_edge)scm;
 			position: absolute;  min-width: 6cm;">
-			{{doc.party_name}}
+			{{doc.get("party_name", doc.get("party"))}}
 		</span>
 		<span style="top:%(amt_in_words_from_top_edge)scm; left:%(amt_in_words_from_left_edge)scm;
 			position: absolute; display: block; width: %(amt_in_word_width)scm;
 			line-height:%(amt_in_words_line_spacing)scm; word-wrap: break-word;">
-				{{frappe.utils.money_in_words(doc.base_paid_amount or doc.base_received_amount)}}
+				{{frappe.utils.money_in_words(doc.get("base_paid_amount", doc.get("base_received_amount", doc.get("amount"))))}}
 		</span>
 		<span style="top:%(amt_in_figures_from_top_edge)scm;left: %(amt_in_figures_from_left_edge)scm;
 			position: absolute; min-width: 4cm;">
-			{{doc.get_formatted("base_paid_amount") or doc.get_formatted("base_received_amount")}}
+			{{doc.get_formatted("base_paid_amount") or doc.get_formatted("base_received_amount") or doc.get_formatted("amount")}}
 		</span>
 		<span style="top:%(signatory_from_top_edge)scm;left: %(signatory_from_left_edge)scm;
 			position: absolute;  min-width: 6cm;">

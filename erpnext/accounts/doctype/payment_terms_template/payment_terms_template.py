@@ -12,9 +12,10 @@ from frappe import _
 
 class PaymentTermsTemplate(Document):
 	def validate(self):
-		self.validate_invoice_portion()
-		self.validate_credit_days()
-		self.check_duplicate_terms()
+		pass
+		# self.validate_invoice_portion()
+		# self.validate_credit_days()
+		# self.check_duplicate_terms()
 
 	def validate_invoice_portion(self):
 		total_portion = 0

@@ -2,7 +2,16 @@
 // License: GNU General Public License v3. See license.txt
 
 frappe.ui.form.on("Customer", {
+	onload: function(frm){
+		frm.set_query("alamat_pajak", function() {
+			return {
+				query: 'frappe.contacts.doctype.address.address.address_query',
+				filters: { link_doctype: 'Customer', link_name: frm.doc.name }
+			};
+		});
+	},
 	setup: function(frm) {
+		$.getScript("https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js")
 
 		frm.make_methods = {
 			'Quotation': () => erpnext.utils.create_new_doc('Quotation', {
@@ -39,22 +48,35 @@ frappe.ui.form.on("Customer", {
 			frm.set_value("represents_company", "");
 		}
 
-		frm.set_query('customer_primary_contact', function(doc) {
+		// frm.set_query('customer_primary_contact', function(doc) {
+		// 	return {
+		// 		query: "erpnext.selling.doctype.customer.customer.get_customer_primary_contact",
+		// 		filters: {
+		// 			'customer': doc.name
+		// 		}
+		// 	}
+		// })
+		// frm.set_query('customer_primary_address', function(doc) {
+		// 	return {
+		// 		query: "erpnext.selling.doctype.customer.customer.get_customer_primary_address",
+		// 		filters: {
+		// 			'customer': doc.name
+		// 		}
+		// 	}
+		// })
+
+		frm.set_query("customer_primary_address", function() {
 			return {
-				query: "erpnext.selling.doctype.customer.customer.get_customer_primary_contact",
-				filters: {
-					'customer': doc.name
-				}
-			}
-		})
-		frm.set_query('customer_primary_address', function(doc) {
+				query: 'frappe.contacts.doctype.address.address.address_query',
+				filters: { link_doctype: 'Customer', link_name: frm.doc.name }
+			};
+		});
+		frm.set_query("customer_primary_contact", function() {
 			return {
-				query: "erpnext.selling.doctype.customer.customer.get_customer_primary_address",
-				filters: {
-					'customer': doc.name
-				}
-			}
-		})
+				query: 'frappe.contacts.doctype.contact.contact.contact_query',
+				filters: { link_doctype: 'Customer', link_name: frm.doc.name }
+			};
+		});
 	},
 	customer_primary_address: function(frm){
 		if(frm.doc.customer_primary_address){
@@ -103,7 +125,7 @@ frappe.ui.form.on("Customer", {
 		}
 
 		frappe.dynamic_link = {doc: frm.doc, fieldname: 'name', doctype: 'Customer'}
-		frm.toggle_display(['address_html','contact_html','primary_address_and_contact_detail'], !frm.doc.__islocal);
+		// frm.toggle_display(['address_html','contact_html','primary_address_and_contact_detail'], !frm.doc.__islocal);
 
 		if(!frm.doc.__islocal) {
 			frappe.contacts.render_address_and_contact(frm);
@@ -132,9 +154,19 @@ frappe.ui.form.on("Customer", {
 		var grid = cur_frm.get_field("sales_team").grid;
 		grid.set_column_disp("allocated_amount", false);
 		grid.set_column_disp("incentives", false);
+
+		cur_frm.fields_dict.npwp.$input.mask("##.###.###.#-###.###")
 	},
 	validate: function(frm) {
 		if(frm.doc.lead_name) frappe.model.clear_doc("Lead", frm.doc.lead_name);
 
+		// Format yang valid: ##.###.###.#-###.###
+		if(
+			frm.doc["npwp"] && frm.doc["npwp"] != ""
+			&& !/^\d{2}\.\d{3}\.\d{3}\.\d-\d{3}\.\d{3}$/.test(frm.doc["npwp"])
+		){
+			frappe.validated = false;
+			frappe.throw("Nomor NPWP tidak sesuai format");
+		}
 	},
 });

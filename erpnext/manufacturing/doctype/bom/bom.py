@@ -634,6 +634,7 @@ def get_bom_items_as_dict(bom, company, qty=1, fetch_exploded=1, fetch_scrap_ite
 			where_conditions="",
 			is_stock_item=is_stock_item,
 			qty_field="stock_qty",
+			groupby_columns="",
 			select_columns = """, bom_item.source_warehouse, bom_item.operation,
 				bom_item.include_item_in_manufacturing, bom_item.description,
 				(Select idx from `tabBOM Item` where item_code = bom_item.item_code and parent = %(parent)s limit 1) as idx""")
@@ -641,7 +642,7 @@ def get_bom_items_as_dict(bom, company, qty=1, fetch_exploded=1, fetch_scrap_ite
 		items = frappe.db.sql(query, { "parent": bom, "qty": qty, "bom": bom, "company": company }, as_dict=True)
 	elif fetch_scrap_items:
 		query = query.format(table="BOM Scrap Item", where_conditions="",
-			select_columns=", bom_item.idx, item.description", is_stock_item=is_stock_item, qty_field="stock_qty")
+			select_columns=", bom_item.idx, item.description", groupby_columns="", is_stock_item=is_stock_item, qty_field="stock_qty")
 
 		items = frappe.db.sql(query, { "qty": qty, "bom": bom, "company": company }, as_dict=True)
 	else:
@@ -649,7 +650,7 @@ def get_bom_items_as_dict(bom, company, qty=1, fetch_exploded=1, fetch_scrap_ite
 			qty_field="stock_qty" if fetch_qty_in_stock_uom else "qty",
 			select_columns = """, bom_item.uom, bom_item.conversion_factor, bom_item.source_warehouse,
 				bom_item.idx, bom_item.operation, bom_item.include_item_in_manufacturing,
-				bom_item.description """)
+				bom_item.description """, groupby_columns="")
 		items = frappe.db.sql(query, { "qty": qty, "bom": bom, "company": company }, as_dict=True)
 
 	for item in items:
