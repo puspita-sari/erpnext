@@ -11,6 +11,8 @@
   "account_head",
   "withholding_tax",
   "prepaid_tax_account",
+  "ar_tax_slip_account",
+  "revenue_recognition_account",
   "col_break_1",
   "description",
   "included_in_print_rate",
@@ -211,11 +213,25 @@
    "fieldtype": "Select",
    "label": "Add or Deduct",
    "options": "Add\nDeduct"
+  },
+  {
+   "depends_on": "eval:doc.withholding_tax == 1",
+   "fieldname": "ar_tax_slip_account",
+   "fieldtype": "Link",
+   "label": "AR Tax Slip Account",
+   "options": "Account"
+  },
+  {
+   "depends_on": "eval:doc.withholding_tax == 1",
+   "fieldname": "revenue_recognition_account",
+   "fieldtype": "Link",
+   "label": "Revenue Recognition Account",
+   "options": "Account"
   }
  ],
  "idx": 1,
  "istable": 1,
- "modified": "2020-03-08 18:52:27.734751",
+ "modified": "2020-06-25 18:05:29.715149",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "Sales Taxes and Charges",

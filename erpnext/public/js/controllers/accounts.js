@@ -16,37 +16,24 @@ frappe.ui.form.on(cur_frm.doctype, {
 	},
 	onload: function(frm) {
 		if(frm.get_field("taxes")) {
-			frm.set_query("account_head", "taxes", function(doc) {
-				if(frm.cscript.tax_table == "Sales Taxes and Charges") {
-					var account_type = ["Tax", "Chargeable", "Expense Account"];
-				} else {
-					var account_type = ["Tax", "Chargeable", "Income Account", "Expenses Included In Valuation"];
-				}
-
-				return {
-					query: "erpnext.controllers.queries.tax_account_query",
-					filters: {
-						"account_type": account_type,
-						"company": doc.company
+			["account_head", "prepaid_tax_account", "ar_tax_slip_account", "revenue_recognition_account"].forEach(field => {
+				frm.set_query(field, "taxes", function(doc) {
+					if(frm.cscript.tax_table == "Sales Taxes and Charges") {
+						var account_type = ["Tax", "Chargeable", "Expense Account"];
+					} else {
+						var account_type = ["Tax", "Chargeable", "Income Account", "Expenses Included In Valuation"];
 					}
-				}
+	
+					return {
+						query: "erpnext.controllers.queries.tax_account_query",
+						filters: {
+							"account_type": account_type,
+							"company": doc.company
+						}
+					}
+				});
 			});
 
-			frm.set_query("prepaid_tax_account", "taxes", function(doc) {
-				if(frm.cscript.tax_table == "Sales Taxes and Charges") {
-					var account_type = ["Tax", "Chargeable", "Expense Account"];
-				} else {
-					var account_type = ["Tax", "Chargeable", "Income Account", "Expenses Included In Valuation"];
-				}
-
-				return {
-					query: "erpnext.controllers.queries.tax_account_query",
-					filters: {
-						"account_type": account_type,
-						"company": doc.company
-					}
-				}
-			});
 
 			frm.set_query("cost_center", "taxes", function(doc) {
 				return {
