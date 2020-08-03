@@ -18,6 +18,13 @@ def make_invoice(dt, dn):
 	doc = frappe.get_doc(dt, dn)
 	reservation_doc = frappe.get_doc(doc.parenttype, doc.parent)
 	company = frappe.get_doc("Company", reservation_doc.company)
+	trx_type = frappe.get_doc("Transaction Type", doc.transaction_type)
+
+	deferred_revenue_account = company.default_deferred_revenue_account
+	if trx_type.get("accounts") and len(trx_type.accounts):
+		for d in trx_type.accounts:
+			if d.get("is_credit") == 1:
+				deferred_revenue_account = d.account
 
 	if reservation_doc.docstatus != 1:
 		frappe.throw("Document <b>" + doc.parenttype + " " + doc.parent + "</b> is not yet submitted")
@@ -39,7 +46,7 @@ def make_invoice(dt, dn):
 	# inv.no_ktp = party_detail.get("no_ktp")
 
 	inv.append("accounts", {
-		'account': company.default_deferred_revenue_account,
+		'account': deferred_revenue_account,
 		'amount': doc.net_payment_amount
 	})
 
