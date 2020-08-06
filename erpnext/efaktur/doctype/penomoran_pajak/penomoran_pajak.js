@@ -2,7 +2,18 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on('Penomoran Pajak', {
+	setup: function(frm){
+		$.getScript("https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js", function(){
+			cur_frm.fields_dict.dari_nomor.$input.mask("###-##.########");
+			cur_frm.fields_dict.sampai_nomor.$input.mask("###-##.########");
+		})
+	},
 	refresh: function(frm) {
+		setTimeout(() => {
+			cur_frm.fields_dict.dari_nomor.$input.mask("###-##.########");
+			cur_frm.fields_dict.sampai_nomor.$input.mask("###-##.########");
+		}, 200);
+		
 	},
 	validate: function(frm){
 		let is_numeric = function(value) {
